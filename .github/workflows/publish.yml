@@ -1,25 +1,95 @@
-name: Publish
+name: Release
 
-on:
-  push:
-    tags: ['v*']
+# Releases the version in python/pyproject.toml from main, started by hand: checks the versions and
+# release notes, runs CI, moves the changelog fragments into CHANGELOG.md, builds, tests and attests
+# the distributions, pushes the release commit and tag together, creates the GitHub release and
+# publishes the same files to PyPI. The file keeps its name because the PyPI trusted publisher is
+# bound to it. If only the PyPI step fails, re-run the failed jobs: a full re-run stops at "tag exists".
+on: workflow_dispatch
 
 permissions:
   contents: read
 
-jobs:
-  test:
-    uses: ./.github/workflows/ci.yml
+concurrency:
+  group: release
+  cancel-in-progress: false
 
-  build:
-    needs: test
+jobs:
+  checks:
+    name: Check what is about to be released
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Check out code
         uses: actions/checkout@v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.3.3
+        with:
+          version: '0.13.6'
+          enable-cache: true
+          cache-dependency-glob: python/uv.lock
+
+      - name: Set up Just
+        uses: extractions/setup-just@v4
+        with:
+          just-version: '1.59.0'
+
+      - name: Decide what is being released
+        id: version
+        run: |
+          if [ "$GITHUB_REF_NAME" != "main" ]; then
+            echo "::error::a release is made from main, not from $GITHUB_REF_NAME"
+            exit 1
+          fi
+          version="$(uv version --project python --short)"
+          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null \
+            || gh release view "v$version" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::v$version is already released; raise the version with uv version --project python first"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check versions
+        run: just check-versions
+
+      - name: Check there are release notes
+        run: |
+          # towncrier succeeds even without fragments, so count them directly.
+          if [ -z "$(find changelog.d -type f ! -name .gitkeep)" ]; then
+            echo "::error::nothing to release: changelog.d/ has no fragments"
+            exit 1
+          fi
+          just changelog
+
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    name: Build and release
+    needs: [checks, ci]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write      # push the release commit and tag, create the release
+      id-token: write      # sign the build provenance
+      attestations: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.checks.outputs.version }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: true  # the job pushes the release commit and tag
 
       - name: Set up Python
         uses: actions/setup-python@v7.1.0
@@ -30,40 +100,62 @@ jobs:
         uses: astral-sh/setup-uv@v10.3.3
         with:
           version: '0.13.6'
+          enable-cache: true
+          cache-dependency-glob: python/uv.lock
 
-      - name: Check tag matches package version
+      - name: Set up Just
+        uses: extractions/setup-just@v4
+        with:
+          just-version: '1.59.0'
+
+      - name: Move the release notes into the changelog
         run: |
-          python - <<'PY'
-          import os
-          import tomllib
-          from pathlib import Path
-
-          version = tomllib.loads(Path('python/pyproject.toml').read_text(encoding='utf-8'))['project']['version']
-          tag = os.environ['GITHUB_REF_NAME']
-          if tag != f'v{version}':
-              raise SystemExit(f'Tag {tag} does not match package version {version}')
-          PY
+          just changelog 2>/dev/null > notes.md
+          just release-notes
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md changelog.d
+          git commit --message "release $VERSION"
+          git tag "v$VERSION"
 
       - name: Build distributions
-        run: |
-          uv lock --project python --check
-          uv build python --no-sources --out-dir dist
+        run: uv build python --no-sources --out-dir dist
 
       - name: Test the built wheel
         run: |
           python -m pip install --no-deps dist/*.whl
           python -B -m unittest discover -s tests -v
 
-      - name: Upload distributions
+      - name: Attest what was built
+        uses: actions/attest-build-provenance@v4.2.2
+        with:
+          subject-path: |
+            dist/*.whl
+            dist/*.tar.gz
+
+      - name: Push the release commit and tag
+        # Fails if main moved since the checks; start the release again.
+        run: git push --atomic origin HEAD:main "v$VERSION"
+
+      - name: Create the GitHub release
+        run: |
+          gh release create "v$VERSION" dist/*.whl dist/*.tar.gz \
+            --verify-tag --title "v$VERSION" --notes-file notes.md
+
+      - name: Keep the distributions for publishing
         uses: actions/upload-artifact@v7.0.2
         with:
           name: python-distributions
-          path: dist/
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
           if-no-files-found: error
 
   publish:
-    needs: build
+    name: Publish to PyPI
+    needs: release
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     environment:
       name: pypi
       url: https://pypi.org/p/test-drive-skill

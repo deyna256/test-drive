@@ -41,20 +41,43 @@ The integration test uses a local synthetic site and a separate browser session.
 agent evaluation cases and their expected outcomes are described in [tests/evals](tests/evals/).
 Use synthetic data in tests and keep credentials, private scenarios and recordings out of the repo.
 
-The browser CLI version in `tests/browser/package.json` must match the version installed by
-`setup-agent-browser`. When updating it, review the installer and skill instructions and run the
-real browser test before accepting the update.
+For development, `uv run --project python test-drive setup-agent-browser` installs the tested
+browser CLI in `~/.test-drive/agent-browser`, as it does for users. To update it, change `VERSION`
+and every digest in `python/src/test_drive/agent_browser_setup.py` together (from
+`gh release view v<version> --repo vercel-labs/agent-browser --json assets`), update the tested
+version in the README and the skill, review the skill instructions and run the real browser test.
+`just check-versions` reports places that disagree.
+
+## Changelog
+
+[CHANGELOG.md](CHANGELOG.md) is built at release time by [towncrier](https://towncrier.readthedocs.io/)
+from fragments in `changelog.d/`, so pull requests never conflict on it. Do not edit CHANGELOG.md by
+hand.
+
+A change that users can notice adds one fragment: a file named `<issue>.<type>.md`, or
+`+<name>.<type>.md` without an issue, with one or two sentences written for users. Types are
+`added`, `changed`, `deprecated`, `removed`, `fixed` and `security`. Development-only changes need no
+fragment. `just changelog` shows the entry the next release will get.
 
 ## Releases
 
-The `publish.yml` workflow checks the version and builds the wheel and source distribution after a
-`v<version>` tag is pushed. It runs the CI checks before publishing those artifacts to PyPI.
-Configure a [pending Trusted Publisher](https://docs.pypi.org/trusted-publishers/creating-a-project-through-oidc/)
-on PyPI with project `test-drive-skill`, owner `deyna256`, repository `test-drive`, workflow
-`publish.yml`, and environment `pypi`. A pending publisher does not reserve the name until the first
-publication. The package version in `python/pyproject.toml` must match the tag, and `python/uv.lock`
-must be current; `uv version --project python <version>` updates both. Update the skill's compatible
-package range when making a breaking CLI change. No PyPI API token is needed for the workflow.
+1. Raise the version with `uv version --project python <version>`, which also updates
+   `python/uv.lock`. Update the skill's compatible package range in the skill and the README when
+   making a breaking CLI or report-data change. `just check-versions` must pass.
+2. Merge that change into `main`.
+3. Start the **Release** workflow (`publish.yml`) from `main` in GitHub Actions.
+
+The workflow checks that the version is new and consistent and that there are fragments, runs CI,
+moves the fragments into `CHANGELOG.md`, builds, tests and attests the wheel and source distribution,
+pushes the `release <version>` commit and `v<version>` tag to `main` together, creates the GitHub
+release with the notes and files, and publishes the same files to PyPI. If `main` moved during the
+run, the push fails and nothing is released; start it again. If only the PyPI step fails, re-run the
+failed jobs; a full re-run stops because the tag exists.
+
+PyPI uses a [Trusted Publisher](https://docs.pypi.org/trusted-publishers/) for project
+`test-drive-skill`, owner `deyna256`, repository `test-drive`, workflow `publish.yml` and environment
+`pypi`; no API token is stored. The workflow pushes to `main` with its own token, so `main` must
+allow GitHub Actions to push.
 
 ## Issues
 

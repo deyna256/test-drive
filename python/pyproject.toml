@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "test-drive-skill"
-version = "0.1.1"
+version = "0.1.2"
 description = "Helpers for the Test Drive agent skill"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -20,7 +20,11 @@ Issues = "https://github.com/deyna256/test-drive/issues"
 test-drive = "test_drive.cli:main"
 
 [dependency-groups]
-dev = ["ruff>=0.16.10", "ty>=0.0.84"]
+dev = [
+    "ruff>=0.16.10",
+    "towncrier>=26.9.0",
+    "ty>=0.0.84",
+]
 
 [tool.uv.build-backend]
 module-name = "test_drive"
@@ -38,3 +42,42 @@ ignore = ["E501"]
 # Russian labels and multilingual scenarios legitimately contain non-Latin characters.
 "**/test_drive/report.py" = ["RUF001"]
 "**/tests/**" = ["RUF001"]
+
+# Run from the repository root with `--config python/pyproject.toml --dir .`; see the Justfile.
+[tool.towncrier]
+directory = "changelog.d"
+filename = "CHANGELOG.md"
+start_string = "<!-- towncrier release notes start -->\n"
+title_format = "## [{version}] - {project_date}"
+issue_format = "[#{issue}](https://github.com/deyna256/test-drive/issues/{issue})"
+underlines = ["", "", ""]
+
+[[tool.towncrier.type]]
+directory = "added"
+name = "Added"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "changed"
+name = "Changed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "deprecated"
+name = "Deprecated"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "removed"
+name = "Removed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "fixed"
+name = "Fixed"
+showcontent = true
+
+[[tool.towncrier.type]]
+directory = "security"
+name = "Security"
+showcontent = true
