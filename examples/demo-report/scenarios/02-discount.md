@@ -1,19 +1,19 @@
-# Скидка в корзине
+# Discount in the cart
 
-## Цель
+## Purpose
 
-Проверить применение скидочного кода к товару.
+Check that a discount code is applied to a product.
 
-## Начальное состояние
+## Initial state
 
-Открыть магазин в новой сессии с пустой корзиной.
+Open the shop in a fresh session with an empty cart.
 
-## Шаги
+## Steps
 
-1. Найти `mug` и добавить Ceramic Mug в корзину.
-2. Ввести код `SAVE10` и применить его.
+1. Search for `mug` and add Ceramic Mug to the cart.
+2. Enter the code `SAVE10` and apply it.
 
-## Критерии приёмки
+## Acceptance criteria
 
-- Отображается сообщение `Code accepted`.
-- Итоговая цена составляет $10.80.
+- The message `Code accepted` is shown.
+- The total is $10.80.
