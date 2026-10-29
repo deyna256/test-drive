@@ -13,3 +13,6 @@ dist/
 # Local discovery links and backups are not part of the package.
 /.agents/skills/test-drive
 /.agents/test-drive.previous/
+
+# The demo report is rendered from its committed run with `just demo-report`.
+/examples/demo-report/report.html

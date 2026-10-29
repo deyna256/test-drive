@@ -31,3 +31,7 @@ changelog:
 # Move the fragments into CHANGELOG.md under the version in python/pyproject.toml.
 release-notes:
     uv run --locked --project python towncrier build --config python/pyproject.toml --dir . --yes --version "$(uv version --project python --short)"
+
+# Render the committed demo run into examples/demo-report/report.html with the current code.
+demo-report:
+    uv run --locked --project python test-drive render-report examples/demo-report/run.json
