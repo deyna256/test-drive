@@ -91,7 +91,9 @@ class SetupTests(unittest.TestCase):
             env.pop("TEST_DRIVE_AGENT_BROWSER", None)
             env["PATH"] = str(binary_dir)
             env["TEST_DRIVE_TEST_ARGS"] = str(root / "npm-args")
-            runtime = root / "isolated runtime"
+            alias = root / "runtime parent alias"
+            alias.symlink_to(root, target_is_directory=True)
+            runtime = alias / "isolated runtime"
             env["TEST_DRIVE_RUNTIME_DIR"] = str(runtime)
             result = subprocess.run(
                 [
@@ -118,7 +120,7 @@ class SetupTests(unittest.TestCase):
             self.assertIn(f"agent-browser@{pinned}", args)
             installed = runtime / "node_modules" / ".bin" / "agent-browser"
             self.assertTrue(installed.is_file())
-            self.assertIn(str(installed), result.stdout)
+            self.assertIn(str(installed.resolve()), result.stdout)
             selected = subprocess.run(
                 [sys.executable, "-m", "test_drive", "agent-browser-path"],
                 env=env,
@@ -127,7 +129,7 @@ class SetupTests(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(selected.returncode, 0, selected.stderr)
-            self.assertEqual(selected.stdout.strip(), str(installed))
+            self.assertEqual(selected.stdout.strip(), str(installed.resolve()))
 
     def test_existing_runtime_directory_is_not_overwritten(self):
         with tempfile.TemporaryDirectory() as directory:

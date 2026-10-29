@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -72,11 +73,12 @@ class ScenarioTests(unittest.TestCase):
             (root / "bad.md").write_text("## Goal\nTest", encoding="utf-8")
             result = subprocess.run(
                 [sys.executable, "-m", "test_drive", "check-scenarios", str(root)],
+                env={**os.environ, "PYTHONIOENCODING": "ascii"},
                 capture_output=True,
                 text=True,
                 check=False,
             )
-            self.assertEqual(result.returncode, 2)
+            self.assertEqual(result.returncode, 2, result.stderr)
             self.assertNotIn("secret-sentinel", result.stdout)
             cases = {case["name"]: case for case in json.loads(result.stdout)["scenarios"]}
             self.assertFalse(cases["Корзина"]["errors"])

@@ -3,6 +3,7 @@
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
 
 
@@ -94,7 +95,12 @@ def main() -> int:
     parser.add_argument("path", type=Path, help="site folder or individual scenario file")
     args = parser.parse_args()
     result = check(args.path)
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    output = json.dumps(result, ensure_ascii=False, indent=2)
+    try:
+        output.encode(sys.stdout.encoding or "utf-8")
+    except UnicodeEncodeError:
+        output = json.dumps(result, ensure_ascii=True, indent=2)
+    print(output)
     return (
         2 if result["site"]["errors"] or any(case["errors"] for case in result["scenarios"]) else 0
     )
