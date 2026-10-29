@@ -113,6 +113,9 @@ checks performed. Use a separate issue for work outside the PR's scope.
 
 ## Documentation and local notes
 
-Keep shared documentation in Markdown and update it with the behaviour it describes. Use `.local/`
+Keep shared documentation in Markdown and update it with the behaviour it describes. The README's
+images are in `docs/assets/`: the marks outline "test drive" in Bricolage Grotesque 700 (OFL),
+`cover.png` is a 1280 × 640 screenshot of `cover.html` for the social preview, and `demo.gif` is a
+recording of the demo report rendered with `just demo-report`. Use `.local/`
 for research, drafts and plans; it is ignored by Git. Move accepted decisions and their reasons into
 shared documentation so a fresh clone contains the information needed to work on the project.
