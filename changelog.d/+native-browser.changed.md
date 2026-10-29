@@ -1,1 +1,0 @@
-`test-drive setup-agent-browser` downloads agent-browser's native binary for your system from its GitHub release and checks its SHA-256 digest, so Node.js and npm are no longer needed. Browsers installed by version 0.1.1 are still found.
