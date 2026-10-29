@@ -4,7 +4,7 @@ build-backend = "uv_build"
 
 [project]
 name = "test-drive-skill"
-version = "0.1.0"
+version = "0.1.1"
 description = "Helpers for the Test Drive agent skill"
 readme = "README.md"
 requires-python = ">=3.10"

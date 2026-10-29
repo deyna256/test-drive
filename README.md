@@ -12,9 +12,9 @@ To install the skill from a checkout for a supported agent, run the following co
 npx skills add ./skills/test-drive --skill test-drive
 ```
 
-After publishing the repository, it can also be installed with `npx skills add deyna256/test-drive --skill test-drive`. The installer can target specific agents or install globally; see the [skills CLI documentation](https://github.com/vercel-labs/skills/blob/main/docs/commands.md).
+You can also install it with `npx skills add deyna256/test-drive --skill test-drive`. The installer can target specific agents or install globally; see the [skills CLI documentation](https://github.com/vercel-labs/skills/blob/main/docs/commands.md).
 
-After the first PyPI release, install the compatible CLI with `uv tool install 'test-drive-skill>=0.1.0,<0.2.0'`, or let the skill run it with `uvx`. Until then, from this checkout run `uvx --from ./python test-drive --version`; replace `test-drive` in the commands below with `uvx --from /absolute/path/to/this/checkout/python test-drive`. Python 3.10+ is required. The package has no third-party Python runtime dependencies.
+Install the compatible CLI with `uv tool install 'test-drive-skill>=0.1.0,<0.2.0'`, or let the skill run it with `uvx`. To use a development checkout, replace `test-drive` in the commands below with `uvx --from /absolute/path/to/this/checkout/python test-drive`. Python 3.10+ is required. The package has no third-party Python runtime dependencies.
 
 For a Codex development checkout, a discovery link keeps the installed skill in sync with this folder:
 
