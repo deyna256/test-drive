@@ -1,0 +1,15 @@
+test-drive-report/
+node_modules/
+__pycache__/
+.venv/
+dist/
+.pytest_cache/
+.ruff_cache/
+.superpowers/
+/.local/
+.env
+.env.*
+!.env.example
+# Local discovery links and backups are not part of the package.
+/.agents/skills/test-drive
+/.agents/test-drive.previous/

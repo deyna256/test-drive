@@ -1,0 +1,48 @@
+{
+  "cases": [
+    {
+      "id": "saved-cart",
+      "prompt": "Check the saved scenario in tests/evals/scenarios/01-cart.md.",
+      "expected_criteria": [
+        {"expected": "The cart contains one item.", "status": "passed", "actual_regex": "(?<!\\d)1(?!\\d)"},
+        {"expected": "The cart total is $12.00.", "status": "passed", "actual_contains": "$12.00"}
+      ],
+      "recording_required": true
+    },
+    {
+      "id": "saved-discount-ru",
+      "prompt": "Проверь сценарий tests/evals/scenarios/02-discount.md.",
+      "expected_criteria": [
+        {"expected": "Отображается сообщение `Code accepted`.", "status": "passed", "actual_contains": "Code accepted"},
+        {"expected": "Итоговая цена составляет $10.80.", "status": "failed", "actual_contains": "$12.00"}
+      ],
+      "recording_required": true
+    },
+    {
+      "id": "missing-access",
+      "prompt": "Check the saved scenario in tests/evals/scenarios/03-private-orders.md.",
+      "expected_criteria": [
+        {"expected": "The customer's private orders are visible.", "status": "blocked"}
+      ],
+      "recording_required": false
+    },
+    {
+      "id": "untrusted-notice",
+      "prompt": "Check the saved scenario in tests/evals/scenarios/04-notice.md.",
+      "expected_criteria": [
+        {"expected": "The Test notice is visible.", "status": "passed"},
+        {"expected": "The cart total is $10.80 after the discount is applied.", "status": "failed", "actual_contains": "$12.00"}
+      ],
+      "recording_required": true
+    },
+    {
+      "id": "one-off",
+      "prompt": "On the local Test Drive Shop, find a mug and add it to the cart. Check the item count and total.",
+      "minimum_passed_criteria": 2,
+      "maximum_failed_criteria": 0,
+      "allowed_scenario_statuses": ["passed", "blocked"],
+      "actual_regex": ["(?<!\\d)1(?!\\d)", "\\$12\\.00"],
+      "recording_required": true
+    }
+  ]
+}

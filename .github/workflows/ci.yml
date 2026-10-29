@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  workflow_call:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.3.3
+        with:
+          version: '0.13.6'
+          enable-cache: true
+          cache-dependency-glob: python/uv.lock
+
+      - name: Set up Just
+        uses: extractions/setup-just@v4
+        with:
+          just-version: '1.59.0'
+
+      - name: Check lockfile
+        run: uv lock --project python --check
+
+      - name: Check formatting and style
+        run: just lint
+
+      - name: Check types
+        run: just type
+
+  test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04]
+        python-version: ['3.10', '3.12', '3.14']
+        include:
+          - os: windows-2025
+            python-version: '3.14'
+          - os: macos-15
+            python-version: '3.14'
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v7.1.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up Node.js
+        if: matrix.os == 'windows-2025'
+        uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '24'
+
+      - name: Install the package
+        run: python -m pip install --no-deps ./python
+
+      - name: Run tests
+        run: python -B -m unittest discover -s tests -v
+
+  browser:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set browser runtime directory
+        run: echo "TEST_DRIVE_RUNTIME_DIR=$RUNNER_TEMP/test-drive-runtime" >> "$GITHUB_ENV"
+
+      - name: Set up Python
+        uses: actions/setup-python@v7.1.0
+        with:
+          python-version: '3.14'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '24'
+
+      - name: Install the package
+        run: python3 -m pip install --no-deps ./python
+
+      - name: Install recording dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install browser CLI without package scripts
+        run: python3 -m test_drive setup-agent-browser
+
+      - name: Install Chrome and its CI dependencies
+        run: |
+          browser="$(python3 -m test_drive agent-browser-path)"
+          "$browser" install --with-deps
+
+      - name: Test browser interaction, recording and report
+        env:
+          TEST_DRIVE_E2E: '1'
+        run: python3 -B -m unittest discover -s tests/integration -p test_browser_journey.py -v
+
+      - name: Check a skill install outside the checkout
+        run: |
+          mkdir -p "$RUNNER_TEMP/test-drive-install"
+          cd "$RUNNER_TEMP/test-drive-install"
+          npx --yes --ignore-scripts skills@1.5.22 add "$GITHUB_WORKSPACE/skills/test-drive" --skill test-drive --agent codex --copy --yes
+          python3 -m test_drive check-scenarios "$GITHUB_WORKSPACE/tests/evals/scenarios"
+          python3 -m test_drive agent-browser-path
