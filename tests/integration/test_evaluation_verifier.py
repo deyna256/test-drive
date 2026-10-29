@@ -11,6 +11,50 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[2]
 
 
+class BlockedEvaluationTests(unittest.TestCase):
+    def test_blocked_criterion_is_checked_by_its_reason(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            run = {
+                "site": {"name": "Shop"},
+                "scenarios": [
+                    {
+                        "name": "Private orders",
+                        "status": "blocked",
+                        "criteria": [
+                            {
+                                "expected": "The customer's private orders are visible.",
+                                "status": "blocked",
+                                "actual": "Stale observation",
+                                "reason": "No credentials were supplied",
+                            }
+                        ],
+                    }
+                ],
+            }
+            source = root / "run.json"
+            source.write_text(json.dumps(run), encoding="utf-8")
+            report = subprocess.run(
+                [sys.executable, "-m", "test_drive", "render-report", str(source)],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(report.returncode, 0, report.stderr)
+            verified = subprocess.run(
+                [
+                    sys.executable,
+                    str(REPO / "tests" / "evals" / "verify.py"),
+                    "missing-access",
+                    str(root),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(verified.returncode, 0, verified.stderr)
+
+
 @unittest.skipUnless(
     shutil.which("ffmpeg") and shutil.which("ffprobe"), "requires ffmpeg and ffprobe"
 )

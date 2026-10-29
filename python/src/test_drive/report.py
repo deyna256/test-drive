@@ -4,6 +4,7 @@ import argparse
 import html
 import json
 import math
+import os
 import re
 import subprocess
 import sys
@@ -532,6 +533,10 @@ def main() -> int:
         ) as file:
             temporary = Path(file.name)
             file.write(report)
+        # NamedTemporaryFile is private (0600); give the report a normally created file's mode.
+        umask = os.umask(0)
+        os.umask(umask)
+        temporary.chmod(0o666 & ~umask)
         temporary.replace(output)
     except (OSError, ValueError, KeyError) as error:
         if temporary is not None:

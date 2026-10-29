@@ -100,6 +100,8 @@ def main() -> int:
                     raise ValueError(f"Incorrect result for: {item['expected']}")
                 actual = matches[0].get("actual", "")
                 reason = matches[0].get("reason", "")
+                # The report shows only the field that matches the status.
+                shown = actual if item["status"] in ("passed", "failed") else reason
                 if item["status"] in ("passed", "failed") and not actual.strip():
                     raise ValueError(f"Missing observation for: {item['expected']}")
                 if item["status"] in ("blocked", "not_run") and not reason.strip():
@@ -110,7 +112,7 @@ def main() -> int:
                     raise ValueError(f"Observation does not match: {item['expected']}")
                 if html.escape(item["expected"]) not in document:
                     raise ValueError(f"Report omits: {item['expected']}")
-                if html.escape(actual or reason) not in document:
+                if html.escape(shown) not in document:
                     raise ValueError(f"Report omits the result for: {item['expected']}")
         else:
             statuses = [item.get("status") for item in criteria]

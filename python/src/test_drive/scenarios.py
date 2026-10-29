@@ -16,21 +16,23 @@ def inspect(path: Path) -> dict:
         return result
 
     fence = None
+    headings = 0
     has_content = False
     skip_underline = False
     for index, line in enumerate(lines):
         if skip_underline:
             skip_underline = False
             continue
-        marker = re.match(r"^\s{0,3}(`{3,}|~{3,})(.*)$", line)
-        if marker:
+        marker = re.match(r"^ {0,3}(`{3,}|~{3,})(.*)$", line)
+        # A backtick fence's info string cannot contain backticks; such a line is a code span.
+        if marker and (fence is not None or marker[1][0] == "~" or "`" not in marker[2]):
             chars, tail = marker.groups()
             if fence is None:
                 fence = (chars[0], len(chars))
             elif chars[0] == fence[0] and len(chars) >= fence[1] and not tail.strip():
                 fence = None
             continue
-        atx = re.match(r"^\s{0,3}#\s+(.+?)\s*#*\s*$", line) if fence is None else None
+        atx = re.match(r"^ {0,3}#(?:[ \t]+(.*))?$", line) if fence is None else None
         setext = (
             fence is None
             and not atx
@@ -41,10 +43,15 @@ def inspect(path: Path) -> dict:
             and re.fullmatch(r" {0,3}=+[ \t]*", lines[index + 1])
         )
         if atx or setext:
-            if result["name"]:
+            if headings:
                 result["errors"].append("File has multiple top-level headings")
+            elif atx:
+                # A closing run of # needs a space before it, unless it is the whole heading.
+                text = (atx.group(1) or "").strip()
+                result["name"] = re.sub(r"(?:^|[ \t]+)#+[ \t]*$", "", text).strip()
             else:
-                result["name"] = atx.group(1) if atx else line.strip()
+                result["name"] = line.strip()
+            headings += 1
             skip_underline = bool(setext)
         elif (
             result["name"]

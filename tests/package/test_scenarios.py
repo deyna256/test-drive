@@ -136,6 +136,45 @@ class ScenarioTests(unittest.TestCase):
             self.assertTrue(result["site"]["errors"])
             self.assertFalse(result["scenarios"][0]["errors"])
 
+    def test_backtick_line_with_backticks_in_its_info_string_is_not_a_fence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "index.md").write_text(INDEX, encoding="utf-8")
+            (root / "install.md").write_text(
+                "# Install\n\n```npm i```\n\nCriterion: shows ok\n", encoding="utf-8"
+            )
+            self.assertFalse(check(root)["scenarios"][0]["errors"])
+
+            (root / "install.md").write_text(
+                "# Install\n\n```npm i```\n\n# Other\n\nText\n", encoding="utf-8"
+            )
+            errors = check(root)["scenarios"][0]["errors"]
+            self.assertTrue(any("multiple top-level headings" in error for error in errors))
+
+            # A tab indent makes an indented code block, not a fence that hides the rest.
+            (root / "install.md").write_text("# Install\n\n\t```\n\nText\n", encoding="utf-8")
+            self.assertFalse(check(root)["scenarios"][0]["errors"])
+
+    def test_heading_text_follows_commonmark_closing_sequences(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "index.md").write_text(INDEX, encoding="utf-8")
+            for heading, name in (
+                ("# Learn C#", "Learn C#"),
+                ("# Title ##", "Title"),
+                ("#\tTitle\t#", "Title"),
+                ("# foo \\#", "foo \\#"),
+                ("# ### b", "### b"),
+            ):
+                (root / "case.md").write_text(f"{heading}\n\nText\n", encoding="utf-8")
+                result = check(root)["scenarios"][0]
+                self.assertEqual(result["name"], name, heading)
+                self.assertFalse(result["errors"], heading)
+            for heading in ("# #", "#"):
+                (root / "case.md").write_text(f"{heading}\n\nText\n", encoding="utf-8")
+                errors = check(root)["scenarios"][0]["errors"]
+                self.assertTrue(any("title is missing" in error for error in errors), heading)
+
 
 if __name__ == "__main__":
     unittest.main()

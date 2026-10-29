@@ -406,6 +406,29 @@ class ReportTests(unittest.TestCase):
             self.assertEqual(result.returncode, 2)
             self.assertEqual(source.read_text(encoding="utf-8"), contents)
 
+    @unittest.skipIf(os.name == "nt", "POSIX file modes")
+    def test_report_gets_the_default_file_mode(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "run.json"
+            source.write_text(
+                json.dumps({"site": {"name": "Shop"}, "scenarios": []}), encoding="utf-8"
+            )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    "import os, sys; os.umask(0o022); sys.argv[1:] = ['render-report', sys.argv[1]];"
+                    " from test_drive.cli import main; sys.exit(main())",
+                    str(source),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((root / "report.html").stat().st_mode & 0o777, 0o644)
+
     def test_existing_temporary_file_is_preserved(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
