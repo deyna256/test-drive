@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -17,6 +18,13 @@ class SkillInstallationTests(unittest.TestCase):
             skill = root / "installed skill" / "test-drive"
             shutil.copytree(SKILL, skill)
             self.assertFalse((skill / "tests").exists())
+            text = (skill / "SKILL.md").read_text(encoding="utf-8")
+            links = set(re.findall(r"\]\(([^)#:]+)\)", text))
+            self.assertIn("references/run-json.md", links)
+            for link in links:
+                self.assertTrue((skill / link).is_file(), link)
+            compatibility = re.search(r"(?m)^compatibility: (.+)$", text)
+            self.assertTrue(compatibility and len(compatibility.group(1)) <= 500)
             workspace = root / "workspace"
             workspace.mkdir()
             shutil.copytree(REPO / "examples" / "shop", workspace / "site")

@@ -14,7 +14,7 @@ npx skills add ./skills/test-drive --skill test-drive
 
 You can also install it with `npx skills add deyna256/test-drive --skill test-drive`. The installer can target specific agents or install globally; see the [skills CLI documentation](https://github.com/vercel-labs/skills/blob/main/docs/commands.md).
 
-Install the compatible CLI with `uv tool install 'test-drive-skill>=0.1.0,<0.2.0'`, or let the skill run it with `uvx`. To use a development checkout, replace `test-drive` in the commands below with `uvx --from /absolute/path/to/this/checkout/python test-drive`. Python 3.10+ is required. The package has no third-party Python runtime dependencies.
+The skill runs the helper CLI with `uvx`, which also provides Python, so you only need [uv](https://docs.astral.sh/uv/). To install the CLI yourself, use `uv tool install 'test-drive-skill>=0.1.0,<0.2.0'`. To use a development checkout, replace `test-drive` in the commands below with `uvx --from /absolute/path/to/this/checkout/python test-drive`. The package has no third-party Python runtime dependencies.
 
 For a Codex development checkout, a discovery link keeps the installed skill in sync with this folder:
 
@@ -61,11 +61,11 @@ Each criterion has its own result and observation or reason. The renderer checks
 
 ## Dependencies
 
-Requirements are Python 3.10+, a stable `agent-browser` version 0.40.0 or newer, a compatible Chrome or Chromium, and `ffmpeg` with the `libvpx` VP8 encoder for WebM recording. The skill checks the browser version before using it; version 0.40.0 is tested with this project. It uses `TEST_DRIVE_AGENT_BROWSER` when set, then its managed runtime, then `agent-browser` on `PATH`.
+Install [uv](https://docs.astral.sh/uv/) and `ffmpeg` with the `libvpx` VP8 encoder for WebM recording: `sudo apt install ffmpeg`, `brew install ffmpeg` or `winget install Gyan.FFmpeg`. The skill sets up the rest on first use.
 
-If a compatible browser CLI is missing, run `test-drive setup-agent-browser`. The setup reuses a compatible CLI when available; otherwise it installs the tested version in `~/.test-drive/agent-browser` using Node.js 24+ and npm, with package install scripts disabled. It does not modify a global `agent-browser` install. To use another runtime directory, pass `--directory PATH` and set `TEST_DRIVE_RUNTIME_DIR` to the same path. The setup does not install Chrome or operating-system packages: see [agent-browser installation](https://agent-browser.dev/installation) for Chrome and system dependencies.
+The browser is driven by a stable `agent-browser` 0.40.0 or newer; version 0.40.0 is tested with this project. The skill uses `TEST_DRIVE_AGENT_BROWSER` when set, then its managed runtime in `~/.test-drive/agent-browser`, then `agent-browser` on `PATH`. If none is compatible, `test-drive setup-agent-browser` downloads the tested release's native binary for your system from GitHub, checks its SHA-256 digest and saves it in the managed runtime, without Node.js or npm and without changing a global install. To use another runtime directory, pass `--directory PATH` and set `TEST_DRIVE_RUNTIME_DIR` to the same path. Chrome for Testing is then downloaded with `agent-browser install`; on Linux, missing system libraries need `agent-browser install --with-deps`, which uses sudo. Other systems can install agent-browser as described in its [installation guide](https://agent-browser.dev/installation) and set `TEST_DRIVE_AGENT_BROWSER`.
 
-For development in this checkout, install the pinned browser with `pnpm -C tests/browser install --frozen-lockfile`, then set `TEST_DRIVE_AGENT_BROWSER="$PWD/tests/browser/node_modules/.bin/agent-browser"` and export it before starting the agent. This setup requires Node.js 24+ and pnpm 12.11+. If Chrome is not installed, `./tests/browser/node_modules/.bin/agent-browser install` downloads Chrome for Testing. Verify the selected executable with `test-drive agent-browser-path`.
+For development in this checkout, run `uv run --project python test-drive setup-agent-browser` and verify the selected executable with `uv run --project python test-drive agent-browser-path`.
 
 ## Development and contributing
 

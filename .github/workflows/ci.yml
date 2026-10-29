@@ -69,17 +69,19 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Set up Node.js
-        if: matrix.os == 'windows-2025'
-        uses: actions/setup-node@v7.1.0
-        with:
-          node-version: '24'
-
       - name: Install the package
         run: python -m pip install --no-deps ./python
 
       - name: Run tests
         run: python -B -m unittest discover -s tests -v
+
+      - name: Download and check the browser CLI
+        if: matrix.os != 'ubuntu-24.04'
+        shell: bash
+        run: |
+          export TEST_DRIVE_RUNTIME_DIR="$RUNNER_TEMP/test-drive-runtime"
+          python -m test_drive setup-agent-browser
+          python -m test_drive agent-browser-path
 
   browser:
     runs-on: ubuntu-24.04
@@ -111,7 +113,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
-      - name: Install browser CLI without package scripts
+      - name: Download the browser CLI
         run: python3 -m test_drive setup-agent-browser
 
       - name: Install Chrome and its CI dependencies
@@ -129,5 +131,8 @@ jobs:
           mkdir -p "$RUNNER_TEMP/test-drive-install"
           cd "$RUNNER_TEMP/test-drive-install"
           npx --yes --ignore-scripts skills@1.5.22 add "$GITHUB_WORKSPACE/skills/test-drive" --skill test-drive --agent codex --copy --yes
+          for file in SKILL.md LICENSE references/run-json.md references/troubleshooting.md; do
+            test -s ".agents/skills/test-drive/$file" || { echo "::error::$file was not installed"; exit 1; }
+          done
           python3 -m test_drive check-scenarios "$GITHUB_WORKSPACE/tests/evals/scenarios"
           python3 -m test_drive agent-browser-path

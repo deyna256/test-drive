@@ -20,5 +20,7 @@ credentials, private scenarios or recordings in a public issue.
 - `site.url` and full HTTP, HTTPS, or file URLs in report text are rejected when they contain
   credentials, a query or a fragment. This check does not detect every secret in arbitrary text,
   file names, screenshots or video. Existing input files are not modified.
-- The setup script installs the browser CLI in a separate directory with npm lifecycle scripts
-  disabled. It does not install operating-system packages or alter an existing runtime directory.
+- The setup command downloads the tested agent-browser release's native binary from GitHub and
+  rejects it unless its SHA-256 digest matches the one stored in the package. It writes only
+  `agent-browser` (or `agent-browser.exe`) in its runtime directory, never overwrites an existing
+  file and does not install operating-system packages.

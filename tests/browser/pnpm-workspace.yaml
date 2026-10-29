@@ -1,7 +1,0 @@
-minimumReleaseAgeExclude:
-  - agent-browser@0.40.0
-permissions:
-  agent-browser:
-    # The bundled binary needs no build; postinstall can rewrite the global npm link.
-    build: false
-    skills: false

@@ -1,264 +1,184 @@
-import json
+import contextlib
+import hashlib
+import io
 import os
-import shlex
-import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
-REPO = Path(__file__).resolve().parents[2]
+from test_drive import agent_browser_setup
+
+FAKE_BROWSER = b"#!/bin/sh\nprintf '%s\\n' 'agent-browser 0.40.0'\n"
+
+
+def setup(directory: Path, env: dict, download: bytes | Exception = FAKE_BROWSER):
+    """Run setup-agent-browser in-process with a fake release download."""
+    requested = []
+
+    def urlopen(url, timeout):
+        requested.append(url)
+        if isinstance(download, Exception):
+            raise download
+        return io.BytesIO(download)
+
+    stdout, stderr = io.StringIO(), io.StringIO()
+    digests = {"test-x64": hashlib.sha256(FAKE_BROWSER).hexdigest()}
+    with (
+        mock.patch.dict(os.environ, env, clear=True),
+        mock.patch.object(sys, "argv", ["setup", "--directory", str(directory)]),
+        mock.patch.object(agent_browser_setup, "platform_name", return_value="test-x64"),
+        mock.patch.object(agent_browser_setup, "DIGESTS", digests),
+        mock.patch("urllib.request.urlopen", urlopen),
+        contextlib.redirect_stdout(stdout),
+        contextlib.redirect_stderr(stderr),
+    ):
+        code = agent_browser_setup.main()
+    return code, stdout.getvalue(), stderr.getvalue(), requested
 
 
 @unittest.skipIf(os.name == "nt", "POSIX executable stubs")
 class SetupTests(unittest.TestCase):
-    def test_existing_compatible_browser_needs_no_installer(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            browser = root / "existing browser"
-            browser.write_text(
-                "#!/bin/sh\nprintf '%s\\n' 'agent-browser 0.40.0'\n", encoding="utf-8"
-            )
-            browser.chmod(0o755)
-            env = os.environ.copy()
-            env["PATH"] = str(root)
-            env["TEST_DRIVE_AGENT_BROWSER"] = str(browser)
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    "-B",
-                    "-m",
-                    "test_drive",
-                    "setup-agent-browser",
-                    "--directory",
-                    str(root / "runtime"),
-                ],
-                env=env,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn(str(browser), result.stdout)
-            self.assertFalse((root / "runtime").exists())
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.env = {"PATH": str(self.root), "HOME": str(self.root)}
+
+    def write_browser(self, path: Path, version: str = "0.40.0") -> Path:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"#!/bin/sh\nprintf '%s\\n' 'agent-browser {version}'\n", encoding="utf-8")
+        path.chmod(0o755)
+        return path
+
+    def test_existing_compatible_browser_needs_no_download(self):
+        browser = self.write_browser(self.root / "existing browser")
+        self.env["TEST_DRIVE_AGENT_BROWSER"] = str(browser)
+        code, stdout, stderr, requested = setup(self.root / "runtime", self.env)
+        self.assertEqual(code, 0, stderr)
+        self.assertIn(str(browser), stdout)
+        self.assertEqual(requested, [])
+        self.assertFalse((self.root / "runtime").exists())
 
     def test_invalid_explicit_browser_is_not_replaced(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            env = os.environ.copy()
-            env["PATH"] = str(root)
-            env["TEST_DRIVE_AGENT_BROWSER"] = str(root / "missing")
-            env["TEST_DRIVE_RUNTIME_DIR"] = str(root / "runtime")
-            result = subprocess.run(
-                [sys.executable, "-B", "-m", "test_drive", "setup-agent-browser"],
-                env=env,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("Cannot run agent-browser", result.stderr)
-            self.assertFalse((root / "runtime").exists())
+        self.env["TEST_DRIVE_AGENT_BROWSER"] = str(self.root / "missing")
+        code, _, stderr, requested = setup(self.root / "runtime", self.env)
+        self.assertNotEqual(code, 0)
+        self.assertIn("Cannot run agent-browser", stderr)
+        self.assertEqual(requested, [])
+        self.assertFalse((self.root / "runtime").exists())
 
-    def test_installs_in_an_isolated_directory_without_install_scripts(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            binary_dir = root / "bin"
-            binary_dir.mkdir()
-            node = binary_dir / "node"
-            node.write_text("#!/bin/sh\nprintf '%s\\n' 'v24.0.0'\n", encoding="utf-8")
-            node.chmod(0o755)
-            fake_npm = root / "fake_npm.py"
-            fake_npm.write_text(
-                "import os, pathlib, sys\n"
-                "args = sys.argv[1:]\n"
-                "pathlib.Path(os.environ['TEST_DRIVE_TEST_ARGS']).write_text('\\n'.join(args))\n"
-                "prefix = pathlib.Path(args[args.index('--prefix') + 1])\n"
-                "binary = prefix / 'node_modules' / '.bin' / 'agent-browser'\n"
-                "binary.parent.mkdir(parents=True)\n"
-                "binary.write_text(\"#!/bin/sh\\nprintf '%s\\\\n' 'agent-browser 0.40.0'\\n\")\n"
-                "binary.chmod(0o755)\n",
-                encoding="utf-8",
-            )
-            npm = binary_dir / "npm"
-            npm.write_text(
-                f'#!/bin/sh\nexec {shlex.quote(sys.executable)} {shlex.quote(str(fake_npm))} "$@"\n',
-                encoding="utf-8",
-            )
-            npm.chmod(0o755)
-            env = os.environ.copy()
-            env.pop("TEST_DRIVE_AGENT_BROWSER", None)
-            env["PATH"] = str(binary_dir)
-            env["TEST_DRIVE_TEST_ARGS"] = str(root / "npm-args")
-            alias = root / "runtime parent alias"
-            alias.symlink_to(root, target_is_directory=True)
-            runtime = alias / "isolated runtime"
-            env["TEST_DRIVE_RUNTIME_DIR"] = str(runtime)
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    "-B",
-                    "-m",
-                    "test_drive",
-                    "setup-agent-browser",
-                    "--directory",
-                    str(runtime),
-                ],
-                env=env,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            args = (root / "npm-args").read_text(encoding="utf-8").splitlines()
-            self.assertIn("--ignore-scripts", args)
-            self.assertIn("--no-global", args)
-            pinned = json.loads(
-                (REPO / "tests" / "browser" / "package.json").read_text(encoding="utf-8")
-            )["devDependencies"]["agent-browser"]
-            self.assertIn(f"agent-browser@{pinned}", args)
-            installed = runtime / "node_modules" / ".bin" / "agent-browser"
-            self.assertTrue(installed.is_file())
-            self.assertIn(str(installed.resolve()), result.stdout)
-            selected = subprocess.run(
-                [sys.executable, "-m", "test_drive", "agent-browser-path"],
-                env=env,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            self.assertEqual(selected.returncode, 0, selected.stderr)
-            self.assertEqual(selected.stdout.strip(), str(installed.resolve()))
+    def test_downloads_the_pinned_release_into_an_existing_directory(self):
+        self.write_browser(self.root / "agent-browser", "0.34.0")  # an old browser on PATH
+        alias = self.root / "runtime parent alias"
+        alias.symlink_to(self.root, target_is_directory=True)
+        runtime = alias / "isolated runtime"
+        runtime.mkdir()
+        (runtime / "keep.txt").write_text("user data", encoding="utf-8")
+        self.env["TEST_DRIVE_RUNTIME_DIR"] = str(runtime)
+        code, stdout, stderr, requested = setup(runtime, self.env)
+        self.assertEqual(code, 0, stderr)
+        self.assertEqual(
+            requested,
+            [
+                "https://github.com/vercel-labs/agent-browser/releases/download/"
+                f"v{agent_browser_setup.VERSION}/agent-browser-test-x64"
+            ],
+        )
+        installed = runtime.resolve() / "agent-browser"
+        self.assertIn(str(installed), stdout)
+        self.assertEqual((runtime / "keep.txt").read_text(encoding="utf-8"), "user data")
+        self.assertEqual(
+            sorted(path.name for path in runtime.iterdir()), ["agent-browser", "keep.txt"]
+        )
+        selected = subprocess.run(
+            [sys.executable, "-m", "test_drive", "agent-browser-path"],
+            env={**os.environ, **self.env},
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(selected.returncode, 0, selected.stderr)
+        self.assertEqual(selected.stdout.strip(), str(installed))
 
-    def test_existing_runtime_directory_is_not_overwritten(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            runtime = root / "runtime"
-            runtime.mkdir()
-            marker = runtime / "keep.txt"
-            marker.write_text("user data", encoding="utf-8")
-            env = os.environ.copy()
-            env.pop("TEST_DRIVE_AGENT_BROWSER", None)
-            env["PATH"] = str(root)
-            env["TEST_DRIVE_RUNTIME_DIR"] = str(runtime)
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    "-B",
-                    "-m",
-                    "test_drive",
-                    "setup-agent-browser",
-                    "--directory",
-                    str(runtime),
-                ],
-                env=env,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            self.assertNotEqual(result.returncode, 0)
-            self.assertEqual(marker.read_text(encoding="utf-8"), "user data")
-            self.assertIn("not changed", result.stderr)
+    def test_digest_mismatch_leaves_nothing_behind(self):
+        runtime = self.root / "runtime"
+        code, _, stderr, _ = setup(runtime, self.env, download=b"tampered")
+        self.assertNotEqual(code, 0)
+        self.assertIn("SHA-256", stderr)
+        self.assertEqual(list(runtime.iterdir()), [])
+
+    def test_download_failure_is_reported_without_partial_files(self):
+        runtime = self.root / "runtime"
+        code, _, stderr, _ = setup(runtime, self.env, download=OSError("network unreachable"))
+        self.assertNotEqual(code, 0)
+        self.assertIn("network unreachable", stderr)
+        self.assertEqual(list(runtime.iterdir()), [])
+
+    def test_incompatible_managed_binary_is_not_overwritten(self):
+        runtime = self.root / "runtime"
+        binary = self.write_browser(runtime / "agent-browser", "0.34.0")
+        code, _, stderr, requested = setup(runtime, self.env)
+        self.assertNotEqual(code, 0)
+        self.assertIn("not changed", stderr)
+        self.assertEqual(requested, [])
+        self.assertIn("0.34.0", binary.read_text(encoding="utf-8"))
 
     def test_reuses_compatible_runtime_in_explicit_directory(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            runtime = root / "runtime"
-            browser = runtime / "node_modules" / ".bin" / "agent-browser"
-            browser.parent.mkdir(parents=True)
-            browser.write_text(
-                "#!/bin/sh\nprintf '%s\\n' 'agent-browser 0.40.0'\n", encoding="utf-8"
-            )
-            browser.chmod(0o755)
-            env = os.environ.copy()
-            env.pop("TEST_DRIVE_AGENT_BROWSER", None)
-            env["TEST_DRIVE_RUNTIME_DIR"] = str(root / "other-runtime")
-            env["PATH"] = str(root)
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    "-B",
-                    "-m",
-                    "test_drive",
-                    "setup-agent-browser",
-                    "--directory",
-                    str(runtime),
-                ],
-                env=env,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn(str(browser), result.stdout)
+        runtime = self.root / "runtime"
+        browser = self.write_browser(runtime / "agent-browser")
+        self.env["TEST_DRIVE_RUNTIME_DIR"] = str(self.root / "other-runtime")
+        code, stdout, stderr, requested = setup(runtime, self.env)
+        self.assertEqual(code, 0, stderr)
+        self.assertIn(str(browser), stdout)
+        self.assertEqual(requested, [])
 
-    def test_install_failure_reports_the_error_code_without_echoing_npm_output(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            for name, script in (
-                ("node", "printf '%s\\n' 'v24.0.0'"),
-                ("npm", "printf '%s\\n' 'npm error code EAI_AGAIN' 'secret-sentinel' >&2; exit 1"),
+    def test_earlier_npm_layout_is_still_found(self):
+        runtime = self.root / "runtime"
+        legacy = self.write_browser(runtime / "node_modules" / ".bin" / "agent-browser")
+        self.env["TEST_DRIVE_RUNTIME_DIR"] = str(runtime)
+        code, stdout, stderr, requested = setup(runtime, self.env)
+        self.assertEqual(code, 0, stderr)
+        self.assertIn(str(legacy), stdout)
+        self.assertEqual(requested, [])
+
+    def test_unusable_npm_layout_gets_a_native_binary_beside_it(self):
+        runtime = self.root / "runtime"
+        legacy = runtime / "node_modules" / ".bin" / "agent-browser"
+        legacy.parent.mkdir(parents=True)
+        legacy.write_text("#!/bin/sh\nexit 127\n", encoding="utf-8")  # Node.js was removed
+        legacy.chmod(0o755)
+        self.env["TEST_DRIVE_RUNTIME_DIR"] = str(runtime)
+        code, stdout, stderr, _ = setup(runtime, self.env)
+        self.assertEqual(code, 0, stderr)
+        self.assertIn(str(runtime / "agent-browser"), stdout)
+        self.assertTrue(legacy.is_file())
+
+
+class PlatformTests(unittest.TestCase):
+    def test_release_names_follow_the_launcher(self):
+        cases = (
+            ("linux", "x86_64", "glibc", "linux-x64"),
+            ("linux", "aarch64", "glibc", "linux-arm64"),
+            ("linux", "x86_64", "", "linux-musl-x64"),
+            ("darwin", "arm64", "", "darwin-arm64"),
+            ("darwin", "x86_64", "", "darwin-x64"),
+            ("win32", "AMD64", "", "win32-x64.exe"),
+            ("win32", "ARM64", "", None),
+            ("freebsd14", "amd64", "", None),
+            ("linux", "riscv64", "glibc", None),
+        )
+        for system, machine, libc, expected in cases:
+            with (
+                self.subTest(system=system, machine=machine),
+                mock.patch.object(sys, "platform", system),
+                mock.patch("platform.machine", return_value=machine),
+                mock.patch("platform.libc_ver", return_value=(libc, "")),
             ):
-                path = root / name
-                path.write_text(f"#!/bin/sh\n{script}\n", encoding="utf-8")
-                path.chmod(0o755)
-            env = os.environ.copy()
-            env.pop("TEST_DRIVE_AGENT_BROWSER", None)
-            env["TEST_DRIVE_RUNTIME_DIR"] = str(root / "runtime")
-            env["PATH"] = str(root)
-            result = subprocess.run(
-                [sys.executable, "-B", "-m", "test_drive", "setup-agent-browser"],
-                env=env,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("EAI_AGAIN", result.stderr)
-            self.assertNotIn("secret-sentinel", result.stdout + result.stderr)
-            self.assertFalse((root / "runtime").exists())
-
-
-@unittest.skipUnless(os.name == "nt" and shutil.which("node"), "requires Windows and Node.js")
-class WindowsSetupTests(unittest.TestCase):
-    def test_npm_runs_without_interpreting_runtime_path_as_shell_code(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            binary_dir = root / "bin"
-            binary_dir.mkdir()
-            npm = binary_dir / "npm.cmd"
-            npm.write_text("@echo off\r\nexit /b 1\r\n", encoding="utf-8")
-            npm_cli = binary_dir / "node_modules" / "npm" / "bin" / "npm-cli.js"
-            npm_cli.parent.mkdir(parents=True)
-            npm_cli.write_text(
-                "const fs = require('fs'), path = require('path');\n"
-                "const args = process.argv.slice(2);\n"
-                "fs.writeFileSync(process.env.TEST_DRIVE_TEST_ARGS, JSON.stringify(args));\n"
-                "const bin = path.join(args[args.indexOf('--prefix') + 1], 'node_modules', '.bin');\n"
-                "fs.mkdirSync(bin, {recursive: true});\n"
-                "fs.writeFileSync(path.join(bin, 'agent-browser.cmd'), '@echo off\\r\\necho agent-browser 0.40.0\\r\\n');\n",
-                encoding="utf-8",
-            )
-            node = shutil.which("node")
-            assert node is not None
-            node_dir = str(Path(node).parent)
-            env = os.environ.copy()
-            env.pop("TEST_DRIVE_AGENT_BROWSER", None)
-            runtime = root / "runtime & space"
-            env["TEST_DRIVE_RUNTIME_DIR"] = str(runtime)
-            env["TEST_DRIVE_TEST_ARGS"] = str(root / "args.json")
-            env["PATH"] = str(binary_dir) + os.pathsep + node_dir
-            result = subprocess.run(
-                [sys.executable, "-B", "-m", "test_drive", "setup-agent-browser"],
-                env=env,
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertTrue((runtime / "node_modules" / ".bin" / "agent-browser.cmd").is_file())
-            self.assertIn("--ignore-scripts", (root / "args.json").read_text(encoding="utf-8"))
+                self.assertEqual(agent_browser_setup.platform_name(), expected)
+        self.assertTrue({name for *_, name in cases if name} <= agent_browser_setup.DIGESTS.keys())
 
 
 if __name__ == "__main__":

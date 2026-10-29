@@ -1,7 +1,0 @@
-{
-  "name": "test-drive",
-  "private": true,
-  "devDependencies": {
-    "agent-browser": "0.40.0"
-  }
-}
