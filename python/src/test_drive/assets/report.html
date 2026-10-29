@@ -4,90 +4,139 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>$page_title — Test Drive</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 36'%3E%3Cpath d='M2 34Q6 34 7 29L9 8Q10 2 16 2H28Q34 2 35 8L37 29Q38 34 42 34Z' fill='%23fff' stroke='%2318212f' stroke-width='3'/%3E%3Ccircle cx='22' cy='19' r='8' fill='%235fc48a'/%3E%3Cpath d='M18.5 19.5l2.5 2.5 4.5-5' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
   <style>
-    :root { color-scheme: light; --ink:#18263a; --muted:#53667e; --line:#dce4ef; --accent:#295ec1; --paper:#fff; --background:#f3f6fa; }
+    :root {
+      --page:#eef1f5; --surface:#fff; --side:#f4f6f9; --ink:#18212f; --muted:#4a5464; --rule:#d5dbe3;
+      --accent:#5865f2; --accent-soft:#e8eafd; --focus:#3b48d6; --video:#0d1016;
+      --pass:#1a6b43; --pass-bg:#e3f2ea; --fail:#b3261e; --fail-bg:#f8e3e1; --wait:#8a5100; --wait-bg:#f6ecd9; --none:#4a5464; --none-bg:#e2e7ee;
+      --pass-mark:#2f9e62; --fail-mark:#d93d33; --wait-mark:#d99a2b; --none-mark:#8a94a3; --on-mark:#fff;
+      --sans:-apple-system,BlinkMacSystemFont,"Segoe UI Variable Text","Segoe UI",Inter,Roboto,"Noto Sans","Helvetica Neue",Arial,sans-serif;
+      --mono:ui-monospace,"SF Mono","Cascadia Mono","JetBrains Mono",Menlo,Consolas,monospace;
+      color-scheme:light;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --page:#15181e; --surface:#1b1f27; --side:#1d212a; --ink:#e4e7ec; --muted:#a3abb8; --rule:#2e3440;
+        --accent:#7b86ff; --accent-soft:#272c4d; --focus:#9da5ff; --video:#0b0d11;
+        --pass:#5fc48a; --pass-bg:#16301f; --fail:#ef7b70; --fail-bg:#3a1d1b; --wait:#e0b155; --wait-bg:#352a14; --none:#a3abb8; --none-bg:#262c36;
+        --pass-mark:#5fc48a; --fail-mark:#ef6b62; --wait-mark:#e0b155; --none-mark:#6b7482; --on-mark:#15181e;
+        color-scheme:dark;
+      }
+    }
+    :root[data-theme="dark"] {
+      --page:#15181e; --surface:#1b1f27; --side:#1d212a; --ink:#e4e7ec; --muted:#a3abb8; --rule:#2e3440;
+      --accent:#7b86ff; --accent-soft:#272c4d; --focus:#9da5ff; --video:#0b0d11;
+      --pass:#5fc48a; --pass-bg:#16301f; --fail:#ef7b70; --fail-bg:#3a1d1b; --wait:#e0b155; --wait-bg:#352a14; --none:#a3abb8; --none-bg:#262c36;
+      --pass-mark:#5fc48a; --fail-mark:#ef6b62; --wait-mark:#e0b155; --none-mark:#6b7482; --on-mark:#15181e;
+      color-scheme:dark;
+    }
     * { box-sizing:border-box; }
-    body { margin:0; background:var(--background); color:var(--ink); font:15px/1.5 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    body { margin:0; background:var(--page); color:var(--ink); font:14px/1.5 var(--sans); }
     a { color:var(--accent); text-decoration-thickness:1px; text-underline-offset:3px; }
-    button { font:inherit; }
-    button:focus-visible, a:focus-visible, video:focus-visible { outline:3px solid #5c8cfc; outline-offset:3px; }
-    .topbar { background:#172a44; color:#fff; padding:14px clamp(18px,4vw,56px); display:flex; align-items:center; gap:11px; }
-    .mark { display:grid; place-items:center; width:32px; height:32px; border-radius:9px; background:#295ec1; font-size:13px; font-weight:800; letter-spacing:.02em; }
-    .brand { font-weight:750; letter-spacing:.01em; }
-    .brand-note { margin-inline-start:auto; color:#bdcbe0; font-size:12px; }
-    .shell { max-width:1500px; margin:auto; padding:30px clamp(18px,4vw,56px) 48px; }
-    .eyebrow { color:#46678d; font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; margin:0 0 6px; }
-    h1 { font-size:clamp(25px,3vw,34px); letter-spacing:-.03em; line-height:1.15; margin:0 0 8px; }
-    .metadata { display:flex; gap:8px 18px; flex-wrap:wrap; color:var(--muted); font-size:13px; overflow-wrap:anywhere; }
-    .context { margin-top:15px; color:var(--muted); font-size:13px; }
-    .context p { margin:5px 0; white-space:pre-wrap; overflow-wrap:anywhere; }
+    button { font:inherit; color:inherit; }
+    :focus-visible { outline:2px solid var(--focus); outline-offset:2px; }
+    .topbar { background:var(--surface); border-bottom:1px solid var(--rule); padding:10px clamp(16px,3vw,40px); display:flex; align-items:center; gap:10px; }
+    .mark { display:block; flex:none; }
+    .brand { font-weight:800; letter-spacing:-.02em; font-size:16px; }
+    .brand-note { margin-inline-start:auto; color:var(--muted); font-size:12.5px; }
+    .theme { flex:none; display:inline-grid; place-items:center; width:34px; height:34px; padding:0; border:1px solid var(--rule); border-radius:999px; background:var(--surface); cursor:pointer; font-size:17px; line-height:1; }
+    .theme:hover { border-color:var(--accent); }
+    .shell { max-width:1500px; margin:auto; padding:24px clamp(16px,3vw,40px) 48px; }
+    .eyebrow { font:600 11px/1 var(--mono); color:var(--muted); letter-spacing:.06em; text-transform:uppercase; margin:0 0 8px; }
+    h1 { font-size:clamp(22px,2.6vw,28px); letter-spacing:-.025em; line-height:1.2; margin:0 0 6px; overflow-wrap:anywhere; }
+    .metadata { display:flex; gap:6px 16px; flex-wrap:wrap; color:var(--muted); font-size:13px; overflow-wrap:anywhere; }
+    .context { margin-top:12px; color:var(--muted); font-size:13px; }
+    .context p { margin:4px 0; white-space:pre-wrap; overflow-wrap:anywhere; }
     .context strong { color:var(--ink); }
-    .summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin:24px 0; }
-    .stat { background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:12px 14px; min-width:0; }
-    .stat-number { font-size:23px; font-weight:750; line-height:1; font-variant-numeric:tabular-nums; }
-    .stat-label { color:var(--muted); font-size:12px; margin-top:5px; }
-    .workspace { display:grid; grid-template-columns:minmax(215px,275px) minmax(0,1fr); align-items:start; gap:16px; }
-    .sidebar, .panel { background:var(--paper); border:1px solid var(--line); border-radius:12px; }
+    .summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:1px; background:var(--rule); border:1px solid var(--rule); border-radius:12px; overflow:hidden; margin:20px 0; }
+    .stat { background:var(--surface); padding:12px 16px; min-width:0; }
+    .stat-number { font-size:28px; font-weight:750; letter-spacing:-.02em; line-height:1.1; font-variant-numeric:tabular-nums; }
+    .stat-label { color:var(--muted); font-size:12.5px; margin-top:2px; }
+    .stat-number.passed { color:var(--pass); } .stat-number.failed { color:var(--fail); } .stat-number.blocked { color:var(--wait); } .stat-number.not_run { color:var(--none); }
+    .si { display:inline-grid; place-items:center; width:18px; height:18px; border-radius:50%; color:var(--on-mark); font:800 11px/1 var(--sans); font-style:normal; flex:none; }
+    .si.passed { background:var(--pass-mark); } .si.failed { background:var(--fail-mark); } .si.blocked { background:var(--wait-mark); } .si.not_run { background:var(--none-mark); }
+    .workspace { display:grid; grid-template-columns:minmax(210px,270px) minmax(0,1fr); align-items:start; gap:16px; }
+    .sidebar, .panel { background:var(--surface); border:1px solid var(--rule); border-radius:12px; }
     .sidebar { position:sticky; top:16px; overflow:hidden; }
-    .sidebar-heading { padding:15px 16px 12px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; font-weight:750; }
+    .sidebar-heading { padding:12px 14px; border-bottom:1px solid var(--rule); display:flex; justify-content:space-between; font-weight:700; font-size:13px; }
     .sidebar-heading span { color:var(--muted); font-weight:500; }
-    .scenario-nav { display:flex; flex-direction:column; gap:3px; padding:7px; max-height:calc(100vh - 180px); overflow:auto; }
-    .scenario-link { display:grid; grid-template-columns:27px minmax(0,1fr); gap:8px; padding:10px 9px; color:var(--ink); text-decoration:none; border-radius:8px; min-height:52px; }
-    .scenario-link:hover { background:#f2f6fd; }
-    .scenario-link[aria-current="true"] { background:#eaf1ff; color:#1e4b9e; }
-    .scenario-number { font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace; color:#52657e; padding-top:1px; }
-    .scenario-name { font-weight:700; overflow-wrap:anywhere; }
-    .scenario-status { display:block; font-size:12px; font-weight:500; margin-top:2px; }
-    .passed { color:#207248; } .failed { color:#a6322d; } .blocked { color:#8a5e12; } .not_run { color:#5f6c7d; }
-    .panel { padding:clamp(18px,2.6vw,30px); min-width:0; }
+    .scenario-nav { display:flex; flex-direction:column; gap:2px; padding:6px; max-height:calc(100vh - 180px); overflow:auto; }
+    .scenario-link { display:grid; grid-template-columns:18px minmax(0,1fr); gap:9px; padding:9px 10px; color:var(--ink); text-decoration:none; border-radius:8px; }
+    .scenario-link .si { margin-top:2px; }
+    .scenario-link:hover { background:var(--side); }
+    .scenario-link[aria-current="true"] { background:var(--accent-soft); box-shadow:inset 3px 0 0 var(--accent); }
+    .scenario-name { font-weight:650; overflow-wrap:anywhere; }
+    .scenario-status { display:block; font-size:12px; font-weight:500; color:var(--muted); margin-top:1px; }
+    .panel { padding:clamp(16px,2.4vw,26px); min-width:0; }
     .panel[hidden] { display:none; }
     .panel-heading { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
-    h2 { font-size:clamp(20px,2vw,26px); line-height:1.25; letter-spacing:-.02em; margin:0 0 5px; overflow-wrap:anywhere; }
-    h3 { font-size:15px; margin:0 0 10px; }
+    h2 { font-size:clamp(19px,2vw,23px); line-height:1.25; letter-spacing:-.02em; margin:0 0 4px; overflow-wrap:anywhere; }
+    h3 { font:600 11px/1 var(--mono); color:var(--muted); letter-spacing:.06em; text-transform:uppercase; margin:0 0 10px; }
     .source { color:var(--muted); font-size:12px; margin:0; overflow-wrap:anywhere; }
-    .badge { padding:5px 9px; border-radius:99px; font-size:12px; font-weight:750; white-space:nowrap; }
-    .badge.passed { background:#eaf7ee; } .badge.failed { background:#fff0ee; } .badge.blocked { background:#fff5e2; } .badge.not_run { background:#eff2f6; }
+    .badge { display:inline-flex; align-items:center; padding:3px 10px; border-radius:999px; font-size:12.5px; font-weight:650; white-space:nowrap; }
+    .badge.passed { background:var(--pass-bg); color:var(--pass); } .badge.failed { background:var(--fail-bg); color:var(--fail); }
+    .badge.blocked { background:var(--wait-bg); color:var(--wait); } .badge.not_run { background:var(--none-bg); color:var(--none); }
     .outcomes { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:22px 0; }
-    .outcome { background:#f5f8fc; border:1px solid #edf1f6; border-radius:9px; padding:13px 14px; min-width:0; }
-    .outcome-label { font-size:11px; font-weight:750; color:#526985; letter-spacing:.035em; margin-bottom:5px; }
+    .outcome { background:var(--side); border:1px solid var(--rule); border-radius:9px; padding:12px 14px; min-width:0; }
+    .outcome-label { font:600 11px/1 var(--mono); color:var(--muted); letter-spacing:.06em; text-transform:uppercase; margin-bottom:6px; }
     .outcome p, .reason, .step-detail { margin:0; white-space:pre-wrap; overflow-wrap:anywhere; }
-    .reason { padding:11px 13px; margin:16px 0 18px; border-inline-start:3px solid #d9a344; background:#fffbf3; font-size:13px; }
-    .section { margin-top:24px; }
-    .criteria { list-style:none; margin:0; padding:0; display:grid; gap:10px; }
-    .criterion { padding:13px 14px; border:1px solid var(--line); border-radius:9px; background:#f9fbfd; }
-    .criterion-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; font-weight:700; }
-    .criterion-heading > span:first-child { white-space:pre-wrap; overflow-wrap:anywhere; }
-    .criterion-detail { margin:8px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; color:var(--muted); font-size:13px; }
-    .criterion-detail strong { color:var(--ink); }
-    .criterion-evidence { display:flex; align-items:center; gap:12px; font-size:13px; }
-    .criterion-evidence:not(:empty) { margin-top:8px; }
-    .video-wrap { background:#101925; border-radius:9px; overflow:hidden; }
-    video { display:block; width:100%; max-height:560px; background:#101925; }
+    .reason { padding:10px 13px; margin:16px 0; border-inline-start:3px solid var(--wait-mark); background:var(--wait-bg); border-radius:0 8px 8px 0; font-size:13px; }
+    .section { margin-top:22px; }
+    .video-wrap { background:var(--video); border-radius:10px; overflow:hidden; }
+    video { display:block; width:100%; max-height:560px; background:var(--video); }
+    .timeline { position:relative; height:40px; margin:28px 9px 0; }
+    .track { position:absolute; inset-inline:0; top:24px; height:6px; border-radius:3px; background:var(--rule); cursor:pointer; }
+    .progress { position:absolute; inset-inline-start:0; top:0; bottom:0; width:0; border-radius:3px; background:var(--accent); }
+    .tick { position:absolute; top:1px; width:4px; height:4px; margin-inline-start:-2px; border-radius:50%; background:var(--surface); opacity:.9; }
+    .marker { position:absolute; top:0; width:20px; height:20px; margin-inline-start:-10px; padding:0; border:2px solid var(--surface); border-radius:50%; color:var(--on-mark); font:800 11px/1 var(--sans); cursor:pointer; display:grid; place-items:center; box-shadow:0 1px 2px rgb(0 0 0 / .25); transition:transform .12s; }
+    .marker:hover { transform:scale(1.2); }
+    .marker.stacked::after { display:none; }
+    .marker::after { content:""; position:absolute; top:18px; left:50%; width:2px; height:8px; margin-left:-1px; background:inherit; }
+    .marker.passed { background:var(--pass-mark); } .marker.failed { background:var(--fail-mark); } .marker.blocked { background:var(--wait-mark); } .marker.not_run { background:var(--none-mark); }
+    .timeline:not(.ready) .tick, .timeline:not(.ready) .marker { visibility:hidden; }
     .asset-link { display:inline-block; font-size:13px; margin-top:8px; }
-    .missing { background:#f4f6f9; color:#66778b; border:1px dashed #cbd5e2; border-radius:9px; padding:16px; font-size:13px; }
-    .steps { list-style:none; margin:0; padding:0; padding-inline-start:10px; border-inline-start:2px solid #e3e9f2; }
-    .step { position:relative; padding:0 0 16px; padding-inline-start:16px; }
-    .step:last-child { padding-bottom:0; }
-    .step:before { content:""; position:absolute; inset-inline-start:-6px; top:7px; width:10px; height:10px; background:#fff; border:2px solid #7898c5; border-radius:50%; }
-    .step-title { display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; font-weight:650; }
-    .seek { border:0; padding:6px 8px; min-width:48px; min-height:36px; background:#edf3ff; color:#2359b6; border-radius:5px; font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace; cursor:pointer; }
-    .seek:hover { background:#dce9ff; }
-    .seek:disabled { color:#7d8794; background:#eff1f4; cursor:not-allowed; }
-    .step-detail { color:var(--muted); font-size:13px; margin-top:4px; }
+    .missing { background:var(--side); color:var(--muted); border:1px dashed var(--rule); border-radius:9px; padding:16px; font-size:13px; }
+    .criteria { list-style:none; margin:0; padding:0; display:grid; gap:8px; }
+    .criterion { padding:11px 13px; border:1px solid var(--rule); border-radius:10px; background:var(--surface); }
+    .criterion.failed { border-color:color-mix(in srgb, var(--fail-mark) 50%, var(--rule)); background:color-mix(in srgb, var(--fail-mark) 6%, var(--surface)); }
+    .criterion-heading { display:grid; grid-template-columns:18px minmax(0,1fr) auto; align-items:start; gap:10px; font-weight:650; }
+    .criterion-heading .si { margin-top:2px; }
+    .criterion-heading > span:nth-child(2) { white-space:pre-wrap; overflow-wrap:anywhere; }
+    .criterion-detail { margin:4px 0 0; padding-inline-start:28px; white-space:pre-wrap; overflow-wrap:anywhere; color:var(--muted); font-size:13px; }
+    .criterion-detail strong { color:var(--ink); font-weight:600; }
+    .criterion-evidence { display:flex; align-items:center; gap:12px; font-size:13px; padding-inline-start:28px; }
+    .criterion-evidence:not(:empty) { margin-top:8px; }
+    .steps { list-style:none; margin:0; padding:0; display:grid; gap:4px; }
+    .step { padding:7px 10px; border:1px solid transparent; border-radius:8px; transition:background .15s, border-color .15s; }
+    .step.current { background:var(--accent-soft); border-color:color-mix(in srgb, var(--accent) 45%, transparent); }
+    .step-title { display:flex; gap:10px; align-items:baseline; flex-wrap:wrap; font-weight:600; }
+    .seek { border:0; padding:3px 8px; min-width:46px; min-height:28px; background:var(--accent-soft); color:var(--accent); border-radius:6px; font:600 12px/1.5 var(--mono); cursor:pointer; }
+    .seek:hover { background:color-mix(in srgb, var(--accent) 22%, transparent); }
+    .seek:disabled { color:var(--muted); background:var(--side); cursor:not-allowed; }
+    .step-detail { color:var(--muted); font-size:13px; margin-top:2px; }
+    .step:has(.seek) .step-detail { padding-inline-start:56px; }
     .step-status { font-size:12px; font-weight:600; }
-    .evidence { display:block; max-width:100%; max-height:460px; border:1px solid var(--line); border-radius:9px; }
-    details { margin-top:18px; border-top:1px solid var(--line); padding-top:14px; }
-    summary { cursor:pointer; color:#375b91; font-weight:650; }
-    details ol { padding-left:22px; }
+    .step-status.passed { color:var(--pass); } .step-status.failed { color:var(--fail); } .step-status.blocked { color:var(--wait); } .step-status.not_run { color:var(--none); }
+    .evidence { display:block; max-width:100%; max-height:460px; border:1px solid var(--rule); border-radius:10px; }
+    details { margin-top:20px; border-top:1px solid var(--rule); padding-top:14px; }
+    summary { cursor:pointer; color:var(--accent); font-weight:650; }
+    details ol { padding-inline-start:22px; }
     details li { padding:3px 0; white-space:pre-wrap; overflow-wrap:anywhere; }
-    .empty { background:var(--paper); border:1px solid var(--line); border-radius:12px; padding:25px; color:var(--muted); }
+    .empty { background:var(--surface); border:1px solid var(--rule); border-radius:12px; padding:24px; color:var(--muted); }
     .footnote { color:var(--muted); font-size:12px; margin:24px 0 0; }
-    @media (max-width:760px) { .summary { grid-template-columns:repeat(2,minmax(0,1fr)); } .workspace { grid-template-columns:1fr; } .sidebar { position:static; } .scenario-nav { max-height:none; } .brand-note { display:none; } .seek { min-width:48px; min-height:44px; } }
+    @media (max-width:760px) { .summary { grid-template-columns:repeat(2,minmax(0,1fr)); } .workspace { grid-template-columns:1fr; } .sidebar { position:static; } .scenario-nav { max-height:none; } .brand-note { display:none; } .seek { min-height:40px; } }
     @media (max-width:480px) { .outcomes { grid-template-columns:1fr; } .panel-heading { flex-direction:column; } }
+    @media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
+    @media print { .theme, .timeline { display:none; } .panel[hidden] { display:block; } .sidebar { position:static; } }
   </style>
 </head>
 <body data-seek-outside="$seek_outside">
-  <header class="topbar"><span class="mark" aria-hidden="true">TD</span><span class="brand">Test Drive</span><span class="brand-note">$brand_note</span></header>
+  <header class="topbar">
+    <svg class="mark" width="28" height="23" viewBox="0 0 44 36" aria-hidden="true"><path d="M2 34Q6 34 7 29L9 8Q10 2 16 2H28Q34 2 35 8L37 29Q38 34 42 34Z" fill="var(--surface)" stroke="var(--ink)" stroke-width="3"/><circle cx="22" cy="19" r="8" fill="var(--pass-mark)"/><path d="M18.5 19.5l2.5 2.5 4.5-5" fill="none" stroke="var(--on-mark)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span class="brand">test drive</span><span class="brand-note">$brand_note</span>
+    <button class="theme" type="button" aria-label="$theme_label" aria-pressed="false"><span aria-hidden="true">◐</span></button>
+  </header>
   <main class="shell">
     <p class="eyebrow">$report_label</p>
     <h1>$site_name</h1>
@@ -98,6 +147,18 @@
     <p class="footnote">$footnote</p>
   </main>
   <script>
+    const root = document.documentElement;
+    const themeButton = document.querySelector('.theme');
+    const storedTheme = () => { try { return localStorage.getItem('test-drive-theme'); } catch { return null; } };
+    const isDark = () => root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+    if (storedTheme() === 'dark' || storedTheme() === 'light') root.dataset.theme = storedTheme();
+    themeButton.setAttribute('aria-pressed', String(isDark()));
+    themeButton.addEventListener('click', () => {
+      root.dataset.theme = isDark() ? 'light' : 'dark';
+      themeButton.setAttribute('aria-pressed', String(isDark()));
+      try { localStorage.setItem('test-drive-theme', root.dataset.theme); } catch {}
+    });
+
     const panels = Array.from(document.querySelectorAll('.panel[id]'));
     const links = Array.from(document.querySelectorAll('.scenario-link'));
     function showScenario(id) {
@@ -120,7 +181,9 @@
       navigate();
       window.addEventListener('hashchange', navigate);
     }
-    document.querySelectorAll('.seek').forEach(button => button.addEventListener('click', () => {
+
+    // Time buttons and timeline markers move the recording to their moment.
+    document.querySelectorAll('.seek, .marker').forEach(button => button.addEventListener('click', () => {
       const video = button.closest('.panel').querySelector('video');
       const time = Number(button.dataset.time);
       if (!video) return;
@@ -136,6 +199,50 @@
       if (video.readyState < 1) video.addEventListener('loadedmetadata', seek, { once:true });
       else seek();
     }));
+
+    // Place the marks by time, follow playback and highlight the current step.
+    panels.forEach(panel => {
+      const video = panel.querySelector('video');
+      const timeline = panel.querySelector('.timeline');
+      const steps = Array.from(panel.querySelectorAll('.step[data-time]'));
+      if (!video) return;
+      const place = () => {
+        if (!timeline || !Number.isFinite(video.duration) || video.duration <= 0) return;
+        timeline.querySelectorAll('[data-time]').forEach(mark => {
+          const time = Number(mark.dataset.time);
+          mark.hidden = time > video.duration;
+          mark.style.insetInlineStart = (Math.min(time, video.duration) / video.duration * 100) + '%';
+        });
+        // Markers closer than their own width stack upwards instead of hiding each other.
+        let previous = null, level = 0;
+        Array.from(timeline.querySelectorAll('.marker:not([hidden])'))
+          .sort((a, b) => a.dataset.time - b.dataset.time)
+          .forEach(marker => {
+            const x = Number(marker.dataset.time) / video.duration * timeline.clientWidth;
+            level = previous !== null && x - previous < 22 ? level + 1 : 0;
+            marker.style.translate = '0 ' + (-level * 22) + 'px';
+            marker.classList.toggle('stacked', level > 0);
+            previous = x;
+          });
+        timeline.classList.add('ready');
+      };
+      const follow = () => {
+        if (timeline && Number.isFinite(video.duration) && video.duration > 0) {
+          timeline.querySelector('.progress').style.width = (video.currentTime / video.duration * 100) + '%';
+        }
+        const current = steps.filter(step => Number(step.dataset.time) <= video.currentTime + 0.05).pop();
+        steps.forEach(step => step.classList.toggle('current', step === current && video.currentTime > 0));
+      };
+      if (video.readyState >= 1) place();
+      video.addEventListener('loadedmetadata', place);
+      video.addEventListener('timeupdate', follow);
+      video.addEventListener('seeked', follow);
+      if (timeline) timeline.querySelector('.track').addEventListener('click', event => {
+        const box = event.currentTarget.getBoundingClientRect();
+        const share = (event.clientX - box.left) / box.width;
+        if (Number.isFinite(video.duration)) video.currentTime = (root.dir === 'rtl' ? 1 - share : share) * video.duration;
+      });
+    });
   </script>
 </body>
 </html>

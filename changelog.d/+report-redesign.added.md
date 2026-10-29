@@ -1,0 +1,1 @@
+The report has a dark theme with a toggle, status icons, and a timeline under each recording: every checked criterion is a marker you can click to jump to that moment, and the current step is highlighted while the video plays.

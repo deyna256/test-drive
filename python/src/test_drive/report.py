@@ -57,6 +57,10 @@ LABELS = {
 for status, (single, plural) in STATUSES.items():
     LABELS[status] = single
     LABELS[f"{status}_count"] = plural
+# Keys added after 0.1 fall back to English, so translations written for 0.1 stay valid.
+REQUIRED_LABELS = frozenset(LABELS)
+LABELS |= {"theme": "Dark theme", "timeline": "Recording timeline"}
+ICONS = {"passed": "✓", "failed": "✕", "blocked": "!", "not_run": "–"}
 # Older runs could specify Russian without storing translated labels.
 LEGACY_RU_LABELS = {
     "brand_note": "Отчёт о проверке",
@@ -99,6 +103,8 @@ LEGACY_RU_LABELS = {
     "blocked_count": "Не удалось проверить",
     "not_run": "Не запускался",
     "not_run_count": "Не запускалось",
+    "theme": "Тёмная тема",
+    "timeline": "Шкала записи",
 }
 TEMPLATE = Path(__file__).resolve().parent / "assets" / "report.html"
 
@@ -249,7 +255,10 @@ def validate(run: object) -> None:
         for key, value in labels.items()
     ):
         raise ValueError("labels must contain known keys with non-empty strings")
-    if language.split("-", 1)[0].lower() not in ("en", "ru") and labels.keys() != LABELS.keys():
+    if (
+        language.split("-", 1)[0].lower() not in ("en", "ru")
+        and not labels.keys() >= REQUIRED_LABELS
+    ):
         raise ValueError("Provide translations for all labels when using another language")
     if not isinstance(run.get("scenarios"), list):
         raise ValueError("A scenarios list is required")
@@ -338,23 +347,37 @@ def validate(run: object) -> None:
             validate_time(step, started, number)
 
 
+def offset(item: dict, started: int | float | None) -> int | float | None:
+    """Seconds from the start of the recording, if the item has a time."""
+    if item.get("recorded_at") is not None and started is not None:
+        return item["recorded_at"] - started
+    return item.get("at")
+
+
+def clock(at: int | float) -> str:
+    minutes, seconds = divmod(int(at), 60)
+    return f"{minutes}:{seconds:02d}"
+
+
 def time_button(item: dict, has_video: bool, started: int | float | None, labels: dict) -> str:
-    at = item.get("at")
-    if at is None and item.get("recorded_at") is not None:
-        at = item["recorded_at"] - started
+    at = offset(item, started)
     if at is not None and has_video:
-        minutes, seconds = divmod(int(at), 60)
-        clock = f"{minutes}:{seconds:02d}"
-        return f'<button class="seek" type="button" data-time="{at:.3f}" aria-label="{text(labels["seek"])} {clock}">{clock}</button>'
+        return f'<button class="seek" type="button" data-time="{at:.3f}" aria-label="{text(labels["seek"])} {clock(at)}">{clock(at)}</button>'
     return ""
+
+
+def icon(status: str) -> str:
+    return f'<i class="si {status}" aria-hidden="true">{ICONS[status]}</i>'
 
 
 def step_markup(step: dict, has_video: bool, started: int | float | None, labels: dict) -> str:
     time = time_button(step, has_video, started, labels)
+    at = offset(step, started)
+    data = f' data-time="{at:.3f}"' if has_video and at is not None else ""
     status = step.get("status")
     label = f'<span class="step-status {status}">{text(labels[status])}</span>' if status else ""
     detail = f'<p class="step-detail">{text(step["detail"])}</p>' if step.get("detail") else ""
-    return f'<li class="step"><div class="step-title">{time}<span>{text(step["name"])}</span>{label}</div>{detail}</li>'
+    return f'<li class="step"{data}><div class="step-title">{time}<span>{text(step["name"])}</span>{label}</div>{detail}</li>'
 
 
 def criterion_markup(
@@ -367,7 +390,7 @@ def criterion_markup(
     evidence_link = f'<a href="{text(evidence)}">{text(labels["evidence"])}</a>' if evidence else ""
     time = time_button(item, has_video, started, labels)
     return (
-        f'<li class="criterion"><div class="criterion-heading"><span>{text(item["expected"])}</span>'
+        f'<li class="criterion {status}"><div class="criterion-heading">{icon(status)}<span>{text(item["expected"])}</span>'
         f'<span class="badge {status}">{text(labels[status])}</span></div>'
         f'<p class="criterion-detail"><strong>{text(field_label)}:</strong> {text(item[field])}</p>'
         f'<div class="criterion-evidence">{time}{evidence_link}</div></li>'
@@ -389,11 +412,34 @@ def scenario_panel(root: Path, scenario: dict, number: int, labels: dict) -> str
     actual = text(scenario.get("actual") or labels["not_recorded"])
     reason = f'<p class="reason">{text(scenario["reason"])}</p>' if scenario.get("reason") else ""
     video, video_error = recording_url(root, scenario.get("video"))
+    started = scenario.get("video_started_at")
+    steps = "".join(
+        step_markup(step, bool(video), started, labels) for step in scenario.get("steps", [])
+    )
+    # Criteria and steps with a time become marks on a timeline under the verified recording.
+    marks = "".join(
+        f'<button class="marker {item["status"]}" type="button" data-time="{at:.3f}" '
+        f'aria-label="{text(labels["seek"])} {clock(at)}: {text(item["expected"])}">{ICONS[item["status"]]}</button>'
+        for item in scenario.get("criteria") or []
+        if (at := offset(item, started)) is not None
+    )
+    ticks = "".join(
+        f'<span class="tick" data-time="{at:.3f}"></span>'
+        for step in scenario.get("steps", [])
+        if (at := offset(step, started)) is not None
+    )
+    timeline = (
+        f'<div class="timeline" role="group" aria-label="{text(labels["timeline"])}">'
+        f'<div class="track"><div class="progress"></div>{ticks}</div>{marks}</div>'
+        if marks or ticks
+        else ""
+    )
     if video:
         video_block = (
             f'<div class="video-wrap"><video controls preload="metadata" src="{text(video)}" '
             f'aria-label="{text(labels["video_label"])}: {text(scenario["name"])}" aria-describedby="scenario-{number}-steps">'
-            f'{text(labels["video_unsupported"])}</video></div><a class="asset-link" href="{text(video)}">{text(labels["video_open"])}</a>'
+            f"{text(labels['video_unsupported'])}</video></div>{timeline}"
+            f'<a class="asset-link" href="{text(video)}">{text(labels["video_open"])}</a>'
         )
     else:
         reasons = [labels[video_error]] if video_error else []
@@ -401,10 +447,6 @@ def scenario_panel(root: Path, scenario: dict, number: int, labels: dict) -> str
             reasons.append(scenario["video_reason"])
         explanation = f": {text('; '.join(reasons))}" if reasons else ""
         video_block = f'<div class="missing">{text(labels["video_missing"])}{explanation}</div>'
-    steps = "".join(
-        step_markup(step, bool(video), scenario.get("video_started_at"), labels)
-        for step in scenario.get("steps", [])
-    )
     steps_block = (
         f'<ol class="steps">{steps}</ol>'
         if steps
@@ -413,8 +455,7 @@ def scenario_panel(root: Path, scenario: dict, number: int, labels: dict) -> str
     criteria = scenario.get("criteria") or []
     if criteria:
         entries = "".join(
-            criterion_markup(root, item, bool(video), scenario.get("video_started_at"), labels)
-            for item in criteria
+            criterion_markup(root, item, bool(video), started, labels) for item in criteria
         )
         outcomes = f'<section class="section"><h3>{text(labels["criteria"])}</h3><ol class="criteria">{entries}</ol></section>'
     else:
@@ -480,7 +521,7 @@ def render(run: dict, root: Path) -> str:
         )
         links = "".join(
             f'<a class="scenario-link" href="#scenario-{i}"{(" data-default" if i == default else "")}>'
-            f'<span class="scenario-number">{i:02d}</span><span class="scenario-name">{text(scenario["name"])}'
+            f'{icon(scenario["status"])}<span class="scenario-name">{text(scenario["name"])}'
             f'<span class="scenario-status {scenario["status"]}">{text(labels[scenario["status"]])}</span></span></a>'
             for i, scenario in enumerate(scenarios, 1)
         )
@@ -508,6 +549,7 @@ def render(run: dict, root: Path) -> str:
         summary_aria=text(labels["summary"]),
         footnote=text(labels["footnote"]),
         seek_outside=text(labels["seek_outside"]),
+        theme_label=text(labels["theme"]),
     )
 
 

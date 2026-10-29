@@ -189,6 +189,77 @@ class ReportTests(unittest.TestCase):
             self.assertTrue(any(t == "a" and a.get("href") == "result.png" for t, a in page.tags))
             self.assertEqual(sum(t == "script" for t, _ in page.tags), 1)
 
+    def test_timeline_marks_criteria_and_steps_only_with_a_verified_recording(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            shutil.copyfile(VIDEO_FIXTURE, root / "run.webm")
+            run = {
+                "site": {"name": "Shop"},
+                "scenarios": [
+                    {
+                        "name": "Cart",
+                        "status": "failed",
+                        "video": "run.webm",
+                        "video_started_at": 10,
+                        "criteria": [
+                            {
+                                "expected": "One item",
+                                "status": "passed",
+                                "actual": "Shown",
+                                "at": 0.4,
+                            },
+                            {"expected": "Total", "status": "failed", "actual": "Wrong"},
+                        ],
+                        "steps": [
+                            {"name": "Open", "recorded_at": 10.2},
+                            {"name": "Add", "at": 0.6},
+                            {"name": "Look"},
+                        ],
+                    }
+                ],
+            }
+
+            def timeline(page):
+                markers = [
+                    (a["data-time"], a["class"])
+                    for t, a in page.tags
+                    if t == "button" and "marker" in a.get("class", "").split()
+                ]
+                steps = [
+                    a.get("data-time")
+                    for t, a in page.tags
+                    if t == "li" and a.get("class") == "step"
+                ]
+                has_track = any(t == "div" and a.get("class") == "timeline" for t, a in page.tags)
+                return has_track, markers, steps
+
+            if shutil.which("ffmpeg"):
+                self.assertEqual(
+                    timeline(Page(render(run, root))),
+                    (True, [("0.400", "marker passed")], ["0.200", "0.600", None]),
+                )
+            run["scenarios"][0]["video"] = "missing.webm"
+            self.assertEqual(timeline(Page(render(run, root))), (False, [], [None, None, None]))
+
+    def test_labels_added_after_0_1_fall_back_to_english(self):
+        with tempfile.TemporaryDirectory() as directory:
+            original = {key: f"fr {key}" for key in LABELS if key not in ("theme", "timeline")}
+            run = {
+                "site": {"name": "Boutique"},
+                "language": "fr",
+                "labels": original,
+                "scenarios": [{"name": "Panier", "status": "not_run", "reason": "Pas encore"}],
+            }
+            page = Page(render(run, Path(directory).resolve()))
+            self.assertTrue(
+                any(t == "button" and a.get("aria-label") == LABELS["theme"] for t, a in page.tags)
+            )
+            self.assertIn("fr not_run", " ".join(page.content))
+            run["labels"] = {"theme": "Thème", **original}
+            page = Page(render(run, Path(directory).resolve()))
+            self.assertTrue(any(a.get("aria-label") == "Thème" for _, a in page.tags))
+            self.assertTrue(set(LEGACY_RU_LABELS) == set(LABELS))
+
     def test_scenario_status_must_match_all_criterion_results(self):
         combinations = [
             (["passed", "passed"], "passed"),
